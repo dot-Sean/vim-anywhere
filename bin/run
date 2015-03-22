@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # vim-anywhere - use Vim whenever, wherever
 # Author: Chris Knadler
@@ -14,7 +14,7 @@
 err() { echo -e "$@" 1>&2; }
 
 require_file_exists() {
-  if [ ! -e $1 ]; then
+  if [ ! -e "$1" ]; then
     err "$1 does not exist. ${@:2}"
     exit 1
   fi
@@ -35,45 +35,45 @@ done
 # run
 ###
 
-AW_PATH=$HOME/.vim-anywhere
-TMPFILE_DIR=/tmp/vim-anywhere
-TMPFILE=$TMPFILE_DIR/doc-$(date +"%y%m%d%H%M%S")
-VIM_OPTS=--nofork
+AW_PATH="$HOME/.vim-anywhere"
+TMPFILE_DIR="/tmp/vim-anywhere"
+TMPFILE="$TMPFILE_DIR/doc-$(date +"%y%m%d%H%M%S")"
+VIM_OPTS="--nofork"
 
 # Use ~/.gvimrc.min or ~/.vimrc.min if one exists
-VIMRC_PATH=($HOME/.gvimrc.min $HOME/.vimrc.min)
-
-for vimrc_path in "${VIMRC_PATH[@]}"; do
-    if [ -f $vimrc_path ]; then
-        VIM_OPTS+=" -u $vimrc_path"
+for vimrc_path in gvimrc vimrc; do
+    if [ -f "${HOME}/.${vimrc_path}.min" ]; then
+        VIM_OPTS="${VIM_OPTS} -u ${HOME}/.${vimrc_path}.min"
         break
     fi
 done
 
-mkdir -p $TMPFILE_DIR
-touch $TMPFILE
+mkdir -p "$TMPFILE_DIR"
+touch "$TMPFILE"
 
-# Linux
-if [[ $OSTYPE == "linux-gnu" ]]; then
-  chmod o-r $TMPFILE # Make file only readable by you
-  gvim $VIM_OPTS $TMPFILE
-  cat $TMPFILE | xclip -selection clipboard
+case "$(uname)" in
+  # Linux
+  Linux)
+    chmod o-r "$TMPFILE" # Make file only readable by you
+    gvim "$VIM_OPTS" "$TMPFILE"
+    cat "$TMPFILE" | xclip -selection clipboard
+    ;;
+  # OSX
+ darwin)
+    # if there is no path file, it must have been deleted or the installer failed
+    require_file_exists "$AW_PATH/.path" \
+      "Please reinstall vim-anywhere."
 
-# OSX
-elif [[ $OSTYPE == "darwin"* ]]; then
-  # if there is no path file, it must have been deleted or the installer failed
-  require_file_exists $AW_PATH/.path \
-    "Please reinstall vim-anywhere."
+    app="$(osascript "$AW_PATH/script/current_app.scpt")"
+    mvim_path="$(cat "$AW_PATH/.path")"
 
-  app=$(osascript $AW_PATH/script/current_app.scpt)
-  mvim_path=$(cat $AW_PATH/.path)
+    require_file_exists "$mvim_path" \
+      "mvim must have been move or uninstalled.\nPlease make sure it is" \
+      "available in your path and then reinstall vim-anywhere."
 
-  require_file_exists $mvim_path \
-    "mvim must have been move or uninstalled.\nPlease make sure it is" \
-    "available in your path and then reinstall vim-anywhere."
-
-  $mvim_path $VIM_OPTS $TMPFILE
-  # todo, fix invalid file
-  pbcopy < $TMPFILE
-  osascript -e "activate application \"$app\""
-fi
+    $mvim_path "$VIM_OPTS" "$TMPFILE"
+    # todo, fix invalid file
+    pbcopy < "$TMPFILE"
+    osascript -e "activate application \"$app\""
+    ;;
+esac
